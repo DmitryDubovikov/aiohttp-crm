@@ -19,7 +19,7 @@ class AddUserView(View):
     @response_schema(OkResponseSchema, 200)
     async def post(self):
         # data = await self.request.json()
-        data = self.request["data"]  # data was retrieved during validation
+        data = self.request["data"]  # data was already  retrieved during validation
         user = User(email=data["email"], id_=uuid.uuid4())
         await self.request.app.crm_accessor.add_user(user)
         return json_response()
