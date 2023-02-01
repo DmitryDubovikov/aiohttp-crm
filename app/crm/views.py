@@ -1,10 +1,11 @@
 import uuid
 from app.web.app import View
-from app.web.utils import json_response
-from aiohttp.web_exceptions import HTTPNotFound
+from app.web.utils import json_response, check_basic_auth
+from aiohttp.web_exceptions import HTTPNotFound, HTTPUnauthorized, HTTPForbidden
 from app.crm.models import User
 from aiohttp_apispec import docs, request_schema, querystring_schema, response_schema
 from app.crm.schemas import (
+    UserSchema,
     UserAddSchema,
     UserGetRequestSchema,
     ListUsersResponseSchema,
@@ -33,8 +34,17 @@ class ListUsersView(View):
     )
     @response_schema(ListUsersResponseSchema, 200)
     async def get(self):
+        if not self.request.headers.get("Authorization"):
+            raise HTTPUnauthorized
+        if not check_basic_auth(
+            self.request.headers["Authorization"],
+            username=self.request.app.config.username,
+            password=self.request.app.config.password,
+        ):
+            HTTPForbidden
+
         users = await self.request.app.crm_accessor.list_users()
-        raw_users = [{"email": user.email, "id_": str(user.id_)} for user in users]
+        raw_users = [UserSchema().dump(user) for user in users]
         return json_response(data={"users": raw_users})
 
 
@@ -43,12 +53,20 @@ class GetUserView(View):
     @querystring_schema(UserGetRequestSchema)
     @response_schema(UserGetResponseSchema, 200)
     async def get(self):
+        if not self.request.headers.get("Authorization"):
+            raise HTTPUnauthorized
+        if not check_basic_auth(
+            self.request.headers["Authorization"],
+            username=self.request.app.config.username,
+            password=self.request.app.config.password,
+        ):
+            HTTPForbidden
         user_id = self.request.query["id"]
         user = await self.request.app.crm_accessor.get_user(uuid.UUID(user_id))
         if user:
             return json_response(
                 data={
-                    "user": {"email": user.email, "id_": str(user.id_)},
+                    "user": UserSchema().dump(user),
                 }
             )
         else:
